@@ -37,3 +37,9 @@
 本次lab修改的文件包括:
 * 
 
+####from lab1:
+- kern/debug/kdebug.c
+- kern/init/init.c
+- kern/trap/trap.c
+
+####from lab2:
