@@ -9,7 +9,7 @@
    usually split, and the remainder added to the list as another free block.
    Please see Page 196~198, Section 8.2 of Yan Wei Min's chinese book "Data Structure -- C programming language"
 */
-// LAB2 EXERCISE 1: YOUR CODE
+// LAB2 EXERCISE 1: 2013011321
 // you should rewrite functions: default_init,default_init_memmap,default_alloc_pages, default_free_pages.
 /*
  * Details of FFMA
@@ -66,77 +66,125 @@ default_init(void) {
 }
 
 static void
-default_init_memmap(struct Page *base, size_t n) {
+default_init_memmap(struct Page *base, size_t n) { //modified
     assert(n > 0);
     struct Page *p = base;
     for (; p != base + n; p ++) {
         assert(PageReserved(p));
-        p->flags = p->property = 0;
+        p->flags = 0;
+        SetPageProperty(p);
+        p->property = 0;
         set_page_ref(p, 0);
+        list_add_before(&free_list, &(p->page_link));
     }
     base->property = n;
-    SetPageProperty(base);
+    // SetPageProperty(base);
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
+    // list_add(&free_list, &(base->page_link));
 }
 
 static struct Page *
-default_alloc_pages(size_t n) {
+default_alloc_pages(size_t n) { //modified
     assert(n > 0);
     if (n > nr_free) {
         return NULL;
     }
-    struct Page *page = NULL;
-    list_entry_t *le = &free_list;
+    struct Page *page = NULL, *current_page;
+    list_entry_t *le = &free_list, *next_le;
     while ((le = list_next(le)) != &free_list) {
         struct Page *p = le2page(le, page_link);
         if (p->property >= n) {
+            int i;
+            for (i = 0; i < n; ++i) {
+                next_le = list_next(le);
+                current_page = le2page(le, page_link);
+                SetPageReserved(current_page);
+                ClearPageProperty(current_page);
+                list_del(le);
+                le = next_le;
+            }
+            if (p->property > n) {
+                le2page(le, page_link)->property = p->property - n;
+            }
+            nr_free -= n;
             page = p;
             break;
         }
     }
-    if (page != NULL) {
-        list_del(&(page->page_link));
-        if (page->property > n) {
-            struct Page *p = page + n;
-            p->property = page->property - n;
-            list_add(&free_list, &(p->page_link));
-    }
-        nr_free -= n;
-        ClearPageProperty(page);
-    }
+    // if (page != NULL) {
+    //     list_del(&(page->page_link));
+    //     if (page->property > n) {
+    //         struct Page *p = page + n;
+    //         p->property = page->property - n;
+    //         list_add(&free_list, &(p->page_link));
+    // }
+    //     nr_free -= n;
+    //     ClearPageProperty(page);
+    // }
     return page;
 }
 
 static void
-default_free_pages(struct Page *base, size_t n) {
+default_free_pages(struct Page *base, size_t n) { // modified
     assert(n > 0);
-    struct Page *p = base;
-    for (; p != base + n; p ++) {
-        assert(!PageReserved(p) && !PageProperty(p));
-        p->flags = 0;
-        set_page_ref(p, 0);
+    // struct Page *p = base;
+    assert(PageReserved(base));
+
+    list_entry_t *le = &free_list;
+    struct Page *pp;
+    while ((le = list_next(le)) != &free_list) {
+        if ((le2page(le, page_link)) > base)
+            break;
     }
-    base->property = n;
+    for (pp = base; pp < base + n; ++pp) {
+        list_add_before(le, &(pp->page_link));
+    }
+    base->flags = 0;
+    set_page_ref(base, 0);
+    ClearPageProperty(base);
     SetPageProperty(base);
-    list_entry_t *le = list_next(&free_list);
-    while (le != &free_list) {
-        p = le2page(le, page_link);
-        le = list_next(le);
-        if (base + base->property == p) {
-            base->property += p->property;
-            ClearPageProperty(p);
-            list_del(&(p->page_link));
-        }
-        else if (p + p->property == base) {
-            p->property += base->property;
-            ClearPageProperty(base);
-            base = p;
-            list_del(&(p->page_link));
-        }
+    base->property = n;
+
+    if (base + n == (pp = le2page(le, page_link))) {
+        base->property += pp->property;
+        pp->property = 0;
     }
+    le = list_prev(&(base->page_link));
+    pp = le2page(le, page_link);
+    if (le != &free_list && pp == base - 1) {
+        while(pp->property == 0) {
+            le = list_prev(le);
+            pp = le2page(le, page_link);
+        }
+        pp->property += base->property;
+        base->property = 0;
+    }
+
+    // for (; p != base + n; p ++) {
+    //     assert(!PageReserved(p) && !PageProperty(p));
+    //     p->flags = 0;
+    //     set_page_ref(p, 0);
+    // }
+    // base->property = n;
+    // SetPageProperty(base);
+    // list_entry_t *le = list_next(&free_list);
+    // while (le != &free_list) {
+    //     p = le2page(le, page_link);
+    //     le = list_next(le);
+    //     if (base + base->property == p) {
+    //         base->property += p->property;
+    //         ClearPageProperty(p);
+    //         list_del(&(p->page_link));
+    //     }
+    //     else if (p + p->property == base) {
+    //         p->property += base->property;
+    //         ClearPageProperty(base);
+    //         base = p;
+    //         list_del(&(p->page_link));
+    //     }
+    // }
     nr_free += n;
-    list_add(&free_list, &(base->page_link));
+    // list_add(&free_list, &(base->page_link));
 }
 
 static size_t
