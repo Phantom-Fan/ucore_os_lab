@@ -493,7 +493,6 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
    }
 #endif
-
     ptep = get_pte(mm->pgdir, addr, 1);
 
    if (ptep == NULL) {
